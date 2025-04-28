@@ -2,184 +2,22 @@ import numpy as np
 import tensorflow as tf
 import matplotlib.pyplot as plt
 import time
-import os
-import shutil
+from varnn import VariationalNeuralNetwork, l2_norm_square
 
-class VariationalNeuralNetwork:
-    """
-    Реализация метода Ритца с использованием нейронных сетей для решения дифференциальных уравнений.
-    В данном примере решается уравнение Пуассона: -u''(x) = f(x) с граничными условиями u(0) = u(1) = 0.
-    """
-
-    def __init__(self, spatial_range=[0, 1], num_hidden=20, batch_size=200, num_iters=1000, lr_rate=1e-3, output_path='Varnn_modern'):
-        """
-        Инициализация параметров модели.
-
-        Args:
-            spatial_range (list): Пространственная область (например, [0, 1]).
-            num_hidden (int): Количество нейронов в каждом скрытом слое.
-            batch_size (int): Размер батча для обучения.
-            num_iters (int): Количество итераций обучения.
-            lr_rate (float): Скорость обучения.
-            output_path (str): Путь для сохранения обученной модели.
-        """
-        self.spatial_range = spatial_range
-        self.num_hidden = num_hidden
-        self.batch_size = batch_size
-        self.num_iters = num_iters
-        self.lr_rate = lr_rate
-        self.output_path = output_path
-        self.loss_history = []  # История изменения функции потерь
-        self.model = self.build_model() # Создание модели
-        self.optimizer = tf.keras.optimizers.Adam(learning_rate=self.lr_rate)  # Оптимизатор Adam
-
-
-    def build_model(self):
-        """
-        Создание полносвязной нейронной сети (Fully Connected Network).
-
-        Returns:
-            tf.keras.Model: Скомпилированная модель Keras.
-        """
-        model = tf.keras.Sequential([
-            tf.keras.layers.Dense(self.num_hidden, activation='tanh', input_shape=(1,)),  # Входной слой
-            tf.keras.layers.Dense(self.num_hidden, activation='tanh'),  # Скрытый слой 1
-            tf.keras.layers.Dense(self.num_hidden, activation='tanh'),  # Скрытый слой 2
-            tf.keras.layers.Dense(1)  # Выходной слой (одно значение)
-        ])
-        return model
-
-    def bubble_function(self, x):
-        """
-        Создание "bubble function" для обеспечения граничных условий Дирихле u(0) = u(1) = 0.
-
-        Args:
-            x (tf.Tensor): Входные данные (значения x).
-
-        Returns:
-            tf.Tensor: Значение "bubble function" в точке x.
-        """
-        a = self.spatial_range[0]
-        b = self.spatial_range[1]
-        return (x - a) * (b - x)
-
-    def right_hand_side(self, x):
-        """
-        Правая часть уравнения Пуассона: f(x) = (pi**2)*sin(pi*x).
-
-        Args:
-            x (tf.Tensor): Входные данные (значения x).
-
-        Returns:
-            tf.Tensor: Значение правой части уравнения в точке x.
-        """
-        return (np.pi**2) * tf.sin(np.pi * x)
-
-    def compute_loss(self, x):
-        """
-        Вычисление функции потерь на основе вариационного принципа.
-
-        Args:
-            x (tf.Tensor): Входные данные (значения x).
-
-        Returns:
-            tf.Tensor: Значение функции потерь.
-        """
-        with tf.GradientTape() as tape:
-            tape.watch(x)  # Отслеживаем градиенты x
-            u_nn = self.model(x)  # Выход нейронной сети
-            u = self.bubble_function(x) * u_nn  # Приближенное решение с учетом граничных условий
-        
-        du_dx = tape.gradient(u, x) # du/dx
-
-        loss = tf.reduce_mean(0.5 * tf.square(du_dx) - self.right_hand_side(x) * u)
-        return loss
-
-    @tf.function
-    def train_step(self, x):
-        """
-        Шаг обучения модели.
-
-        Args:
-            x (tf.Tensor): Входные данные (значения x).
-        """
-        with tf.GradientTape() as tape:
-            loss = self.compute_loss(x) # Вычисляем loss
-        gradients = tape.gradient(loss, self.model.trainable_variables) # Градиенты loss по обучаемым переменным
-        self.optimizer.apply_gradients(zip(gradients, self.model.trainable_variables)) # Применяем градиенты
-
-        return loss
-
-
-    def train(self):
-        """
-        Обучение нейронной сети.
-        """
-        if os.path.exists(self.output_path):
-            shutil.rmtree(self.output_path)
-        os.makedirs(self.output_path)
-
-        for iteration in range(self.num_iters):
-            # Генерация случайных точек в пространственной области
-            batch_data = self.spatial_range[0] + (self.spatial_range[1] - self.spatial_range[0]) * np.random.rand(self.batch_size, 1).astype(np.float32)
-            batch_data_tf = tf.convert_to_tensor(batch_data, dtype=tf.float32)
-
-            # Шаг обучения
-            loss = self.train_step(batch_data_tf)
-            self.loss_history.append(loss.numpy()) # Сохраняем loss
-
-            if (iteration + 1) % 100 == 0:
-                print(f'Iteration: {iteration + 1}, Loss: {loss.numpy():.4f}')
-
-        # Сохранение обученной модели
-        self.model.save(os.path.join(self.output_path, 'model.keras'))
-
-    def predict(self, x):
-        """
-        Предсказание значения u(x) с использованием обученной нейронной сети.
-
-        Args:
-            x (np.ndarray): Входные значения x, для которых нужно сделать предсказание.
-
-        Returns:
-            np.ndarray: Предсказанные значения u(x).
-        """
-        x_tf = tf.convert_to_tensor(x.reshape(-1, 1), dtype=tf.float32) # Преобразуем в тензор
-        u_nn = self.model(x_tf) # Прогоняем через модель
-        u = self.bubble_function(x_tf) * u_nn # Учитываем граничные условия
-        return u.numpy()
-
-    def predict_derivative(self, x):
-        """
-        Предсказание производной u'(x) с использованием обученной нейронной сети.
-
-        Args:
-            x (np.ndarray): Входные значения x, для которых нужно сделать предсказание.
-
-        Returns:
-            np.ndarray: Предсказанные значения u'(x).
-        """
-        x_tf = tf.convert_to_tensor(x.reshape(-1, 1), dtype=tf.float32)
-
-        with tf.GradientTape() as tape:
-            tape.watch(x_tf)
-            u_nn = self.model(x_tf)
-            u = self.bubble_function(x_tf) * u_nn
-
-        du_dx = tape.gradient(u, x_tf)
-        return du_dx.numpy()
-
-# Main execution block
 if __name__ == "__main__":
     # Define parameters
     spatial_range = [0, 1]
-    num_hidden = 32
-    batch_size = 128
+    num_hidden = 20
+    batch_size = 200
     num_iters = 2000
     learning_rate = 1e-3
+    num_layers = 3
+    optimizer = 'adam'
 
     # Create and train the model
-    varnn = VariationalNeuralNetwork(spatial_range, num_hidden, batch_size, num_iters, learning_rate)
+    varnn = VariationalNeuralNetwork(spatial_range=spatial_range, num_hidden=num_hidden,
+                                      batch_size=batch_size, num_iters=num_iters,
+                                      lr_rate=learning_rate, num_layers=num_layers, optimizer=optimizer)
     start_time = time.time()
     varnn.train()
     end_time = time.time()
@@ -187,7 +25,7 @@ if __name__ == "__main__":
     print(f"Training time: {training_time:.2f} seconds")
 
     # Generate test data
-    num_points = 100
+    num_points = 150
     x_test = np.linspace(spatial_range[0], spatial_range[1], num_points)
 
     # Make predictions
@@ -197,6 +35,21 @@ if __name__ == "__main__":
     # Compute exact solution
     u_exact = np.sin(np.pi * x_test)
     du_dx_exact = np.pi * np.cos(np.pi * x_test)
+
+    ### ERRORS ###
+
+    aposterrori_error_norm_estimate = varnn.compute_aposterrori_error_estimate(x_test)
+    print(f"A Posteriori Error Estimate: {aposterrori_error_norm_estimate:.4f}")
+
+    real_error_norm = l2_norm_square(u_exact.reshape(-1, 1) - u_predicted, spatial_range[0], spatial_range[1])
+    print(f"A Real Error: {real_error_norm:.4f}")
+
+    real_error_norm_dx = l2_norm_square(du_dx_exact.reshape(-1, 1) - du_dx_predicted, spatial_range[0], spatial_range[1])
+    print(f"A Real Error dx: {real_error_norm_dx:.4f}")
+
+    print(f"Compare: aposterrori_error_norm_estimate/real_error_norm = { (aposterrori_error_norm_estimate/real_error_norm):.4f}")
+
+    ### ERRORS ###
 
     # Plot results
     plt.figure(figsize=(12, 6))
