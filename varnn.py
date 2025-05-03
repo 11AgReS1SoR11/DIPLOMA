@@ -2,6 +2,7 @@ import numpy as np
 import tensorflow as tf
 import os
 import shutil
+from derivative import calculate_auto_derivative_2, calculate_auto_derivative, get_cubic_interpolation
 
 def l2_norm_square(x, a, b):
     return (tf.reduce_mean(tf.square(x)) * (b - a)).numpy()
@@ -12,11 +13,12 @@ class VariationalNeuralNetwork:
     В данном примере решается уравнение Пуассона: -u''(x) = f(x) с граничными условиями u(0) = u(1) = 0.
     """
 
-    def __init__(self, spatial_range=[0, 1], num_hidden=20, batch_size=200, num_iters=1000, lr_rate=1e-3, num_layers=3, optimizer='adam', output_path='Varnn_modern'):
+    def __init__(self, right_hand_side_function, spatial_range=[0, 1], num_hidden=20, batch_size=200, num_iters=1000, lr_rate=1e-3, num_layers=3, optimizer='adam', output_path='Varnn_modern'):
         """
         Инициализация параметров модели.
 
         Args:
+            right_hand_side_function (callable): Функция правой части уравнения f(x). Принимает tf.Tensor x и возвращает tf.Tensor f(x).
             spatial_range (list): Пространственная область (например, [0, 1]).
             num_hidden (int): Количество нейронов в каждом скрытом слое.
             batch_size (int): Размер батча для обучения.
@@ -35,6 +37,7 @@ class VariationalNeuralNetwork:
         self.output_path = output_path
         self.loss_history = []  # История изменения функции потерь
         self.optimizer_name = optimizer # Сохраняем название оптимизатора
+        self.right_hand_side_function = right_hand_side_function  # Сохраняем функцию правой части
         self.model = self.build_model() # Создание модели
         self.optimizer = self.get_optimizer()  # Выбираем оптимизатор  <----
 
@@ -84,19 +87,6 @@ class VariationalNeuralNetwork:
         b = self.spatial_range[1]
         return (x - a) * (b - x)
 
-    def right_hand_side(self, x):
-        """
-        Правая часть уравнения Пуассона: f(x) = (pi**2)*sin(pi*x).
-
-        Args:
-            x (tf.Tensor): Входные данные (значения x).
-
-        Returns:
-            tf.Tensor: Значение правой части уравнения в точке x.
-        """
-        return (np.pi**2) * tf.sin(np.pi * x)
-        # return tf.where(x < 0.5, 1.0, -1.0)
-
     def compute_loss(self, x):
         """
         Вычисление функции потерь на основе вариационного принципа.
@@ -114,7 +104,7 @@ class VariationalNeuralNetwork:
         
         du_dx = tape.gradient(u, x) # du/dx
 
-        loss = tf.reduce_mean(0.5 * tf.square(du_dx) - self.right_hand_side(x) * u) * (self.spatial_range[1] - self.spatial_range[0])
+        loss = tf.reduce_mean(0.5 * tf.square(du_dx) - self.right_hand_side_function(x) * u) * (self.spatial_range[1] - self.spatial_range[0])
         return loss
 
     @tf.function
@@ -199,27 +189,21 @@ class VariationalNeuralNetwork:
         du_dx = tape.gradient(u, x_tf)
         return du_dx.numpy()
 
-    def compute_aposterrori_error_estimate(self, x, beta=1.0):
+    def compute_aposterrori_error_estimate(self, x, u_exact, beta=1.0):
         """
         Вычисление апостериорной оценки ошибки.
 
         Args:
             x (np.ndarray): Входные значения x.
+            u_exact (callable or tf.Tensor): Точного решения u(x).
             beta (float): Параметр beta в функционале.
 
         Returns:
             float: Апостериорная оценка ошибки.
         """
-        x_tf = tf.convert_to_tensor(x.reshape(-1, 1), dtype=tf.float32)
-
         # 1) Находим производную точного решения
-        with tf.GradientTape() as tape_exact2:  # Вторая градиентная лента для точного решения
-            tape_exact2.watch(x_tf)
-            with tf.GradientTape() as tape_exact1:  # Первая градиентная лента для точного решения
-                tape_exact1.watch(x_tf)
-                u_exact = tf.sin(np.pi * x_tf)  # Точное решение
-            du_exact_dx = tape_exact1.gradient(u_exact, x_tf)  # U'
-        d2u_exact_dx2 = tape_exact2.gradient(du_exact_dx, x_tf)  # U''
+        du_exact_dx = calculate_auto_derivative(x, u_exact) if callable(u_exact) else get_cubic_interpolation(x, u_exact, derivative=1) # U'
+        d2u_exact_dx2 = calculate_auto_derivative_2(x, u_exact) if callable(u_exact) else get_cubic_interpolation(x, u_exact, derivative=2) # U''
 
         # 2) Находим производную решения, полученного нейронной сетью
         du_approx_dx = self.predict_derivative(x) # Производная приближенного решения (V')
@@ -235,7 +219,8 @@ class VariationalNeuralNetwork:
         C_Omega = (b - a) / np.pi
 
         # 5) Находим норму невязки исходного уравнения ||U'' + f(x)||
-        f_x = self.right_hand_side(x_tf)
+        x_tf = tf.convert_to_tensor(x.reshape(-1, 1), dtype=tf.float32)
+        f_x = self.right_hand_side_function(x_tf)
         residual = d2u_exact_dx2 + f_x  # U'' + f(x)
         residual = residual.numpy().reshape(-1, 1)
         norm_residual_squared = l2_norm_square(residual, self.spatial_range[0], self.spatial_range[1])
