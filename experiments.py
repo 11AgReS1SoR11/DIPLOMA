@@ -21,7 +21,7 @@ def create_table(data, filename):
 
     df = pd.DataFrame(data)
 
-    plt.figure(figsize=(12, len(df) * 0.5))  # Adjust figure size based on number of rows
+    plt.figure(figsize=(15, len(df) * 0.5))  # Adjust figure size based on number of rows
     ax = plt.subplot(111, frame_on=False)
     ax.xaxis.set_visible(False)
     ax.yaxis.set_visible(False)
@@ -55,6 +55,7 @@ def run_experiment(num_hidden, num_layers, num_iters, learning_rate, batch_size 
     num_points = 100  # Количество точек для вычисления ошибки
     x_test = np.linspace(spatial_range[0], spatial_range[1], num_points)  # Тестовые данные
     u_exact = np.sin(np.pi * x_test)  # Точное решение
+    du_dx_exact = np.pi * np.cos(np.pi * x_test)
 
     # Создаем и обучаем модель
     varnn = VariationalNeuralNetwork(spatial_range=spatial_range, num_hidden=num_hidden,
@@ -69,10 +70,12 @@ def run_experiment(num_hidden, num_layers, num_iters, learning_rate, batch_size 
 
     # Вычисляем апостериорную оценку ошибки и реальную ошибку
     aposterrori_error_estimate = varnn.compute_aposterrori_error_estimate(x_test)
-    real_error = l2_norm_square(u_exact.reshape(-1, 1) - u_predicted, spatial_range[0], spatial_range[1])
+
+    du_dx_predicted = varnn.predict_derivative(x_test)
+    real_error_norm_dx = l2_norm_square(du_dx_exact.reshape(-1, 1) - du_dx_predicted, spatial_range[0], spatial_range[1])
 
     # Вычисляем отношение
-    ratio = (aposterrori_error_estimate / real_error) if real_error != 0 else np.nan
+    ratio_dx = (aposterrori_error_estimate / real_error_norm_dx) if real_error_norm_dx != 0 else np.nan
 
     results = {
         "batch size": batch_size,
@@ -82,14 +85,17 @@ def run_experiment(num_hidden, num_layers, num_iters, learning_rate, batch_size 
         "Iterations": num_iters,
         "Learning Rate": learning_rate,
         "||M||^2": aposterrori_error_estimate,
-        "||U-V||^2": real_error,
-        "||M||^2/||U-V||^2": ratio,
+        "||U'-V'||^2": real_error_norm_dx,
+        "||M||^2/||U'-V'||^2": ratio_dx,
         "Training Time": training_time
     }
 
     return results
 
 if __name__ == "__main__":
+
+    postfix = "ppsin(px)" # set for different filenames
+
     # 1) Эксперименты с количеством нейронов
     neuron_counts = [10, 16, 32, 64]
     neuron_data = []
@@ -98,7 +104,7 @@ if __name__ == "__main__":
         neuron_data.append(results)
 
     neuron_df = pd.DataFrame(neuron_data)
-    create_table(neuron_df.to_dict('list'), "results_neurons.png")
+    create_table(neuron_df.to_dict('list'), f"results_neurons_{postfix}.png")
 
     # 2) Эксперименты с количеством слоев
     layer_counts = [2, 3, 4, 5]
@@ -108,7 +114,7 @@ if __name__ == "__main__":
         layer_data.append(results)
 
     layer_df = pd.DataFrame(layer_data)
-    create_table(layer_df.to_dict('list'), "results_layers.png")
+    create_table(layer_df.to_dict('list'), f"results_layers_{postfix}.png")
 
     # 3) Эксперименты с количеством итераций
     iterations_counts = [1000, 2000, 3000, 4000]
@@ -118,7 +124,7 @@ if __name__ == "__main__":
         iters_data.append(results)
 
     iters_df = pd.DataFrame(iters_data)
-    create_table(iters_df.to_dict('list'), "results_iters.png")
+    create_table(iters_df.to_dict('list'), f"results_iters_{postfix}.png")
 
     # 4) Эксперименты со скоростью обучения
     learning_rates = [1e-2, 1e-3, 1e-4, 1e-5]
@@ -128,7 +134,7 @@ if __name__ == "__main__":
         lr_data.append(results)
 
     lr_df = pd.DataFrame(lr_data)
-    create_table(lr_df.to_dict('list'), "results_lr.png")
+    create_table(lr_df.to_dict('list'), f"results_lr_{postfix}.png")
 
     # 5) Эксперименты с разными оптимизаторами
     optimizers = ['adam', 'sgd', 'rmsprop']
@@ -138,7 +144,7 @@ if __name__ == "__main__":
         optimizer_data.append(results)
 
     optimizer_df = pd.DataFrame(optimizer_data)
-    create_table(optimizer_df.to_dict('list'), "results_optimizers.png")
+    create_table(optimizer_df.to_dict('list'), f"results_optimizers_{postfix}.png")
 
     # 6) Эксперименты с разными оптимизаторами
     batch_sizes = [64, 128, 256, 512, 1024]
@@ -148,7 +154,7 @@ if __name__ == "__main__":
         batch_size_data.append(results)
 
     optimizer_df = pd.DataFrame(batch_size_data)
-    create_table(optimizer_df.to_dict('list'), "results_batchSize.png")
+    create_table(optimizer_df.to_dict('list'), f"results_batchSize_{postfix}.png")
 
     # # 7) Best parametrs
     # optimizers = ['adam', 'sgd', 'rmsprop']
@@ -158,7 +164,7 @@ if __name__ == "__main__":
     #     best_data.append(results)
 
     # best_df = pd.DataFrame(best_data)
-    # create_table(best_df.to_dict('list'), "best.png")
+    # create_table(best_df.to_dict('list'), f"best_{postfix}.png")
 
     print("All experiments finished!")
 

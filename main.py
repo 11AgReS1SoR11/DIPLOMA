@@ -41,13 +41,10 @@ if __name__ == "__main__":
     aposterrori_error_norm_estimate = varnn.compute_aposterrori_error_estimate(x_test)
     print(f"A Posteriori Error Estimate: {aposterrori_error_norm_estimate:.4f}")
 
-    real_error_norm = l2_norm_square(u_exact.reshape(-1, 1) - u_predicted, spatial_range[0], spatial_range[1])
-    print(f"A Real Error: {real_error_norm:.4f}")
-
     real_error_norm_dx = l2_norm_square(du_dx_exact.reshape(-1, 1) - du_dx_predicted, spatial_range[0], spatial_range[1])
     print(f"A Real Error dx: {real_error_norm_dx:.4f}")
 
-    print(f"Compare: aposterrori_error_norm_estimate/real_error_norm = { (aposterrori_error_norm_estimate/real_error_norm):.4f}")
+    print(f"Compare: aposterrori_error_norm_estimate/real_error_norm_dx = { (aposterrori_error_norm_estimate/real_error_norm_dx):.4f}")
 
     ### ERRORS ###
 
