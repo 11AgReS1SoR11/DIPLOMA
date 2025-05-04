@@ -5,6 +5,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import tensorflow as tf
 from derivative import calculate_auto_derivative, get_cubic_interpolation
+from Approx import solver_bvp
 
 
 def create_table(data, filename):
@@ -38,7 +39,7 @@ def create_table(data, filename):
     plt.close()  # Close the figure to release memory
 
 
-def run_experiment(f, U, spatial_range, num_hidden, num_layers, num_iters, learning_rate, batch_size = 128, optimizer = 'adam'):
+def run_experiment(f, U, num_points, spatial_range, num_hidden, num_layers, num_iters, learning_rate, batch_size = 128, optimizer = 'adam'):
     """
     Проводит эксперимент с заданными параметрами и возвращает результаты.
 
@@ -53,9 +54,8 @@ def run_experiment(f, U, spatial_range, num_hidden, num_layers, num_iters, learn
     """
 
     # Параметры для нашей задачи
-    num_points = 100  # Количество точек для вычисления ошибки
     x_test = np.linspace(spatial_range[0], spatial_range[1], num_points)  # Тестовые данные
-    u_exact = U(x_test) # Точное решение
+    u_exact = U(x_test) if callable(U) else U # Точное решение
     du_dx_exact = get_cubic_interpolation(x_test, u_exact, derivative=1) # the same np.pi * np.cos(np.pi * x_test)
 
     # Создаем и обучаем модель
@@ -94,12 +94,12 @@ def run_experiment(f, U, spatial_range, num_hidden, num_layers, num_iters, learn
     return results
 
 
-def experiments(f, U, spatial_range, postfix):
+def experiments(f, U, num_points, spatial_range, postfix):
     # 1) Эксперименты с количеством нейронов
     neuron_counts = [10, 16, 32, 64]
     neuron_data = []
     for num_hidden in neuron_counts:
-        results = run_experiment(f=f, U=U, spatial_range=spatial_range, num_hidden=num_hidden, num_layers=3, num_iters=2000, learning_rate=1e-3)
+        results = run_experiment(f=f, U=U, num_points=num_points, spatial_range=spatial_range, num_hidden=num_hidden, num_layers=3, num_iters=2000, learning_rate=1e-3)
         neuron_data.append(results)
 
     neuron_df = pd.DataFrame(neuron_data)
@@ -109,7 +109,7 @@ def experiments(f, U, spatial_range, postfix):
     layer_counts = [2, 3, 4, 5]
     layer_data = []
     for num_layers in layer_counts:
-        results = run_experiment(f=f, U=U, spatial_range=spatial_range, num_hidden=32, num_layers=num_layers, num_iters=2000, learning_rate=1e-3)
+        results = run_experiment(f=f, U=U, num_points=num_points, spatial_range=spatial_range, num_hidden=32, num_layers=num_layers, num_iters=2000, learning_rate=1e-3)
         layer_data.append(results)
 
     layer_df = pd.DataFrame(layer_data)
@@ -119,7 +119,7 @@ def experiments(f, U, spatial_range, postfix):
     iterations_counts = [1000, 2000, 3000, 4000]
     iters_data = []
     for num_iters in iterations_counts:
-        results = run_experiment(f=f, U=U, spatial_range=spatial_range, num_hidden=32, num_layers=3, num_iters=num_iters, learning_rate=1e-3)
+        results = run_experiment(f=f, U=U, num_points=num_points, spatial_range=spatial_range, num_hidden=32, num_layers=3, num_iters=num_iters, learning_rate=1e-3)
         iters_data.append(results)
 
     iters_df = pd.DataFrame(iters_data)
@@ -129,7 +129,7 @@ def experiments(f, U, spatial_range, postfix):
     learning_rates = [1e-2, 1e-3, 1e-4, 1e-5]
     lr_data = []
     for learning_rate in learning_rates:
-        results = run_experiment(f=f, U=U, spatial_range=spatial_range, num_hidden=32, num_layers=3, num_iters=2000, learning_rate=learning_rate)
+        results = run_experiment(f=f, U=U, num_points=num_points, spatial_range=spatial_range, num_hidden=32, num_layers=3, num_iters=2000, learning_rate=learning_rate)
         lr_data.append(results)
 
     lr_df = pd.DataFrame(lr_data)
@@ -139,7 +139,7 @@ def experiments(f, U, spatial_range, postfix):
     optimizers = ['adam', 'sgd', 'rmsprop']
     optimizer_data = []
     for optimizer in optimizers:
-        results = run_experiment(f=f, U=U, spatial_range=spatial_range, num_hidden=32, num_layers=3, num_iters=2000, learning_rate=1e-3, optimizer=optimizer)
+        results = run_experiment(f=f, U=U, num_points=num_points, spatial_range=spatial_range, num_hidden=32, num_layers=3, num_iters=2000, learning_rate=1e-3, optimizer=optimizer)
         optimizer_data.append(results)
 
     optimizer_df = pd.DataFrame(optimizer_data)
@@ -149,7 +149,7 @@ def experiments(f, U, spatial_range, postfix):
     batch_sizes = [64, 128, 256, 512, 1024]
     batch_size_data = []
     for batch_size in batch_sizes:
-        results = run_experiment(f=f, U=U, spatial_range=spatial_range, num_hidden=32, num_layers=3, num_iters=2000, learning_rate=1e-3, batch_size=batch_size)
+        results = run_experiment(f=f, U=U, num_points=num_points, spatial_range=spatial_range, num_hidden=32, num_layers=3, num_iters=2000, learning_rate=1e-3, batch_size=batch_size)
         batch_size_data.append(results)
 
     optimizer_df = pd.DataFrame(batch_size_data)
@@ -157,6 +157,8 @@ def experiments(f, U, spatial_range, postfix):
 
 
 if __name__ == "__main__":
+
+    num_points = 100
 
     spatial_range = [0, 1]
 
@@ -167,7 +169,12 @@ if __name__ == "__main__":
         return tf.sin(np.pi * x)
 
     postfix = "ppsin(px)" # set for different filenames
-    experiments(f, U, spatial_range, postfix)
+    # experiments(f, U, num_points, spatial_range, postfix)
+
+    postfix = "ppsin(px)_approx"
+    x = np.linspace(spatial_range[0], spatial_range[1], num_points)
+    x, u_data = solver_bvp(x, f)
+    # experiments(f, u_data, num_points, spatial_range, postfix)
 
     spatial_range2 = [-1, 1]
 
@@ -177,8 +184,45 @@ if __name__ == "__main__":
     def U2(x):
         return tf.where(x < 0, 0.5 * x * (x + 1), -0.5 * x * (x - 1))
 
-    postfix = "-1+1" # set for different filenames
-    experiments(f2, U2, spatial_range2, postfix)
+    postfix = "-1+1"
+    # experiments(f2, U2, num_points, spatial_range2, postfix)
 
+    postfix = "-1+1_approx"
+    x = np.linspace(spatial_range2[0], spatial_range2[1], num_points)
+    x, u_data2 = solver_bvp(x, f2)
+
+    experiments(f2, u_data2, num_points, spatial_range2, postfix)
 
     print("All experiments finished!")
+
+
+##################################
+#
+# нужно проверить на следующих функциях
+# 1. Функция с высоким осциллирующим компонентом:
+# def f_oscillating(x):
+#   return np.sin(10 * np.pi * x)  # Высокая частота
+# 2. Функция с резким пиком (Гауссиан):
+# def f_gaussian(x):
+#   center = 0.5
+#   sigma = 0.05  # Узкий пик
+#   return np.exp(- (x - center)**2 / (2 * sigma**2))
+# 3. Функция с разрывом производной (абсолютное значение):
+# def f_abs(x):
+#   return np.abs(x - 0.5)
+# 4. Комбинация функций:
+# def f_combined(x):
+#   return np.sin(5 * np.pi * x) + np.exp(- (x - 0.25)**2 / 0.01) + 0.1 * np.abs(x - 0.75)
+# 5. Случайная функция:
+# def f_random(x):
+#   return np.random.rand(1)[0]  # Возвращает случайное число (не зависящее от x!)
+# def f_random(x, x_grid):
+#     """
+#     Возвращает случайные значения, определенные в точках сетки x_grid,
+#     и интерполирует между ними линейно.
+#     """
+#     if not hasattr(f_random, 'random_values'): # Создаем случайные значения только один раз
+#       f_random.random_values = np.random.rand(len(x_grid))
+#     return np.interp(x, x_grid, f_random.random_values)
+#
+##################################

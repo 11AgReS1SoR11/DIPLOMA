@@ -4,9 +4,10 @@ import matplotlib.pyplot as plt
 import time
 from varnn import VariationalNeuralNetwork, l2_norm_square
 from derivative import calculate_auto_derivative, get_cubic_interpolation
+from Approx import FDM, solver_bvp
 
 
-def solver(f, U, spatial_range, num_hidden, batch_size, num_iters, learning_rate, num_layers, optimizer, filename = "output"):
+def solver(f, U, num_points, spatial_range, num_hidden, batch_size, num_iters, learning_rate, num_layers, optimizer, filename):
     # Create and train the model
     varnn = VariationalNeuralNetwork(right_hand_side_function=f, spatial_range=spatial_range, num_hidden=num_hidden,
                                       batch_size=batch_size, num_iters=num_iters,
@@ -18,7 +19,6 @@ def solver(f, U, spatial_range, num_hidden, batch_size, num_iters, learning_rate
     print(f"Training time: {training_time:.2f} seconds")
 
     # Generate test data
-    num_points = 150
     x_test = np.linspace(spatial_range[0], spatial_range[1], num_points)
 
     # Make predictions
@@ -26,7 +26,7 @@ def solver(f, U, spatial_range, num_hidden, batch_size, num_iters, learning_rate
     du_dx_predicted = varnn.predict_derivative(x_test)
 
     # Compute exact solution
-    u_exact = U(x_test)
+    u_exact = U(x_test) if callable(U) else U
     du_dx_exact = get_cubic_interpolation(x_test, u_exact, derivative=1) # the same np.pi * np.cos(np.pi * x_test) or calculate_auto_derivative(x_test, U).numpy()
 
     ### ERRORS ###
@@ -72,16 +72,9 @@ def solver(f, U, spatial_range, num_hidden, batch_size, num_iters, learning_rate
     plt.savefig(f"{filename}_Loss_History.png")
 
 
+def tryExact(num_points, num_hidden, batch_size, num_iters, learning_rate, num_layers, optimizer):
 
-if __name__ == "__main__":
-    # Define parameters
     spatial_range = [0, 1]
-    num_hidden = 20
-    batch_size = 200
-    num_iters = 2000
-    learning_rate = 1e-3
-    num_layers = 3
-    optimizer = 'adam'
 
     def f(x):
         return (np.pi**2) * tf.sin(np.pi * x)
@@ -89,8 +82,7 @@ if __name__ == "__main__":
     def U(x):
         return tf.sin(np.pi * x)
 
-    solver(f, U, spatial_range, num_hidden, batch_size, num_iters, learning_rate, num_layers, optimizer, "solve_glad")
-
+    solver(f, U, num_points, spatial_range, num_hidden, batch_size, num_iters, learning_rate, num_layers, optimizer, "exact_glad")
 
     spatial_range2 = [-1, 1]
 
@@ -100,5 +92,42 @@ if __name__ == "__main__":
     def U2(x):
         return tf.where(x < 0, 0.5 * x * (x + 1), -0.5 * x * (x - 1))
 
-    solver(f2, U2, spatial_range2, num_hidden, batch_size, num_iters, learning_rate, num_layers, optimizer, "solve_not_glad")
+    solver(f2, U2, num_points, spatial_range2, num_hidden, batch_size, num_iters, learning_rate, num_layers, optimizer, "exact_not_glad")
 
+
+def tryApprox(num_points, num_hidden, batch_size, num_iters, learning_rate, num_layers, optimizer):
+
+    spatial_range = [0, 1]
+
+    def f(x):
+        return (np.pi**2) * tf.sin(np.pi * x)
+
+    x = np.linspace(spatial_range[0], spatial_range[1], num_points)
+    x, u_data = solver_bvp(x, f)
+
+    solver(f, u_data, num_points, spatial_range, num_hidden, batch_size, num_iters, learning_rate, num_layers, optimizer, "approx_glad")
+
+    spatial_range2 = [-1, 1]
+
+    def f2(x):
+        return tf.where(x < 0, -1.0, 1.0)
+
+    x = np.linspace(spatial_range2[0], spatial_range2[1], num_points)
+    x, u_data2 = solver_bvp(x, f2)
+
+    solver(f2, u_data2, num_points, spatial_range2, num_hidden, batch_size, num_iters, learning_rate, num_layers, optimizer, "approx_not_glad")
+
+
+if __name__ == "__main__":
+    # Define parameters
+    num_hidden = 20
+    batch_size = 128
+    num_iters = 2000
+    learning_rate = 1e-3
+    num_layers = 3
+    optimizer = 'adam'
+    num_points = 100
+
+    tryExact(num_points, num_hidden, batch_size, num_iters, learning_rate, num_layers, optimizer)
+
+    tryApprox(num_points, num_hidden, batch_size, num_iters, learning_rate, num_layers, optimizer)

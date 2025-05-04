@@ -202,15 +202,17 @@ class VariationalNeuralNetwork:
             float: Апостериорная оценка ошибки.
         """
         # 1) Находим производную точного решения
-        du_exact_dx = calculate_auto_derivative(x, u_exact) if callable(u_exact) else get_cubic_interpolation(x, u_exact, derivative=1) # U'
-        d2u_exact_dx2 = calculate_auto_derivative_2(x, u_exact) if callable(u_exact) else get_cubic_interpolation(x, u_exact, derivative=2) # U''
+        du_exact_dx = calculate_auto_derivative(x, u_exact) if callable(u_exact) else get_cubic_interpolation(x, u_exact, derivative=1).reshape(-1, 1) # U'
+        d2u_exact_dx2 = calculate_auto_derivative_2(x, u_exact) if callable(u_exact) else get_cubic_interpolation(x, u_exact, derivative=2).reshape(-1, 1) # U''
 
         # 2) Находим производную решения, полученного нейронной сетью
         du_approx_dx = self.predict_derivative(x) # Производная приближенного решения (V')
 
         # 3) Находим норму разности производных ||U' - V'||
         diff = du_exact_dx - du_approx_dx
-        diff = diff.numpy().reshape(-1, 1)
+        if callable(u_exact):
+            diff = diff.numpy()
+        diff.reshape(-1, 1)
         norm_diff_derivs_squared = l2_norm_square(diff, self.spatial_range[0], self.spatial_range[1])
 
         # 4) Считаем константу Фридгерца
