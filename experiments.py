@@ -160,38 +160,63 @@ if __name__ == "__main__":
 
     num_points = 100
 
-    spatial_range = [0, 1]
+    # ########################### TEST №1 ###########################
+    # spatial_range = [0, 1]
 
-    def f(x):
-        return (np.pi**2) * tf.sin(np.pi * x)
+    # def f(x):
+    #     return (np.pi**2) * tf.sin(np.pi * x)
 
-    def U(x):
-        return tf.sin(np.pi * x)
+    # def U(x):
+    #     return tf.sin(np.pi * x)
 
-    postfix = "ppsin(px)" # set for different filenames
-    # experiments(f, U, num_points, spatial_range, postfix)
+    # postfix = "ppsin(px)" # set for different filenames
+    # # experiments(f, U, num_points, spatial_range, postfix)
 
-    postfix = "ppsin(px)_approx"
-    x = np.linspace(spatial_range[0], spatial_range[1], num_points)
-    x, u_data = solver_bvp(x, f)
-    # experiments(f, u_data, num_points, spatial_range, postfix)
+    # postfix = "ppsin(px)_approx"
+    # x = np.linspace(spatial_range[0], spatial_range[1], num_points)
+    # x, u_data = solver_bvp(x, f)
+    # # experiments(f, u_data, num_points, spatial_range, postfix)
+    # ########################### TEST №1 ###########################
 
-    spatial_range2 = [-1, 1]
 
-    def f2(x):
-        return tf.where(x < 0, -1.0, 1.0)
+    # ########################### TEST №2 ###########################
+    # spatial_range2 = [-1, 1]
 
-    def U2(x):
-        return tf.where(x < 0, 0.5 * x * (x + 1), -0.5 * x * (x - 1))
+    # def f2(x):
+    #     return tf.where(x < 0, -1.0, 1.0)
 
-    postfix = "-1+1"
-    # experiments(f2, U2, num_points, spatial_range2, postfix)
+    # def U2(x):
+    #     return tf.where(x < 0, 0.5 * x * (x + 1), -0.5 * x * (x - 1))
 
-    postfix = "-1+1_approx"
-    x = np.linspace(spatial_range2[0], spatial_range2[1], num_points)
-    x, u_data2 = solver_bvp(x, f2)
+    # postfix = "-1+1"
+    # # experiments(f2, U2, num_points, spatial_range2, postfix)
 
-    experiments(f2, u_data2, num_points, spatial_range2, postfix)
+    # postfix = "-1+1_approx"
+    # x = np.linspace(spatial_range2[0], spatial_range2[1], num_points)
+    # x, u_data2 = solver_bvp(x, f2)
+
+    # experiments(f2, u_data2, num_points, spatial_range2, postfix)
+    # ########################### TEST №2 ###########################
+
+
+    ########################### TEST №3 ###########################
+    spatial_range3 = [0, 1]
+
+    def f3(x):
+        return 100 * (np.pi**2) * tf.sin(10 * np.pi * x)
+
+    def U3(x):
+        return tf.sin(10 * np.pi * x)
+
+    postfix = "oscillating"
+    experiments(f3, U3, num_points, spatial_range3, postfix)
+
+    postfix = "oscillating_approx"
+    x = np.linspace(spatial_range3[0], spatial_range3[1], num_points)
+    x, u_data3 = solver_bvp(x, f3)
+
+    experiments(f3, u_data3, num_points, spatial_range3, postfix)
+    ########################### TEST №3 ###########################
 
     print("All experiments finished!")
 
