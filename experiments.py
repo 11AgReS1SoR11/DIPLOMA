@@ -160,43 +160,43 @@ if __name__ == "__main__":
 
     num_points = 100
 
-    # ########################### TEST №1 ###########################
-    # spatial_range = [0, 1]
+    ########################### TEST №1 ###########################
+    spatial_range = [0, 1]
 
-    # def f(x):
-    #     return (np.pi**2) * tf.sin(np.pi * x)
+    def f(x):
+        return (np.pi**2) * tf.sin(np.pi * x)
 
-    # def U(x):
-    #     return tf.sin(np.pi * x)
+    def U(x):
+        return tf.sin(np.pi * x)
 
-    # postfix = "ppsin(px)" # set for different filenames
-    # # experiments(f, U, num_points, spatial_range, postfix)
+    postfix = "ppsin(px)" # set for different filenames
+    # experiments(f, U, num_points, spatial_range, postfix)
 
-    # postfix = "ppsin(px)_approx"
-    # x = np.linspace(spatial_range[0], spatial_range[1], num_points)
-    # x, u_data = solver_bvp(x, f)
-    # # experiments(f, u_data, num_points, spatial_range, postfix)
-    # ########################### TEST №1 ###########################
+    postfix = "ppsin(px)_approx"
+    x = np.linspace(spatial_range[0], spatial_range[1], num_points)
+    x, u_data = solver_bvp(x, f)
+    # experiments(f, u_data, num_points, spatial_range, postfix)
+    ########################### TEST №1 ###########################
 
 
-    # ########################### TEST №2 ###########################
-    # spatial_range2 = [-1, 1]
+    ########################### TEST №2 ###########################
+    spatial_range2 = [-1, 1]
 
-    # def f2(x):
-    #     return tf.where(x < 0, -1.0, 1.0)
+    def f2(x):
+        return tf.where(x < 0, -1.0, 1.0)
 
-    # def U2(x):
-    #     return tf.where(x < 0, 0.5 * x * (x + 1), -0.5 * x * (x - 1))
+    def U2(x):
+        return tf.where(x < 0, 0.5 * x * (x + 1), -0.5 * x * (x - 1))
 
-    # postfix = "-1+1"
-    # # experiments(f2, U2, num_points, spatial_range2, postfix)
+    postfix = "-1+1"
+    # experiments(f2, U2, num_points, spatial_range2, postfix)
 
-    # postfix = "-1+1_approx"
-    # x = np.linspace(spatial_range2[0], spatial_range2[1], num_points)
-    # x, u_data2 = solver_bvp(x, f2)
+    postfix = "-1+1_approx"
+    x = np.linspace(spatial_range2[0], spatial_range2[1], num_points)
+    x, u_data2 = solver_bvp(x, f2)
 
-    # experiments(f2, u_data2, num_points, spatial_range2, postfix)
-    # ########################### TEST №2 ###########################
+    experiments(f2, u_data2, num_points, spatial_range2, postfix)
+    ########################### TEST №2 ###########################
 
 
     ########################### TEST №3 ###########################
@@ -217,6 +217,51 @@ if __name__ == "__main__":
 
     experiments(f3, u_data3, num_points, spatial_range3, postfix)
     ########################### TEST №3 ###########################
+
+    ########################### TEST №4: Gaussian Peak ###########################
+    spatial_range4 = [-5, 5]
+    peak_center = 0
+    peak_width = 0.5
+    peak_height = 10
+
+    def f4(x):
+        return peak_height * tf.exp(-((x - peak_center)**2) / (2 * peak_width**2))
+
+    def U4(x):
+        return -6.26657*x*tf.math.erf(np.sqrt(2)*x) - 2.5*tf.exp(-2*x*x) + 31.3329
+
+
+    postfix = "gaussian_peak"
+    experiments(f4, U4, num_points, spatial_range4, postfix)
+
+    postfix = "gaussian_peak_approx"
+    x = np.linspace(spatial_range4[0], spatial_range4[1], num_points)
+    x, u_data4 = solver_bvp(x, f4)
+
+    experiments(f4, u_data4, num_points, spatial_range4, postfix)
+    ########################### TEST №4 ###########################
+
+    # ########################### TEST №5:  Sawtooth Wave ###########################
+    # spatial_range6 = [0, 2*np.pi]
+    # period = np.pi
+
+    # def f6(x):
+    #     return tf.clip_by_value(x % period, 0, period)  # Пила от 0 до period
+
+    # def U6(x):
+    #     # Двойной интеграл пилы
+    #     x_mod = x % period
+    #     return (1/6)*x_mod**3 - (period/4)*x_mod**2 + (1/12)*period**2*x_mod
+
+    # postfix = "sawtooth"
+    # # experiments(f6, U6, num_points, spatial_range6, postfix)
+
+    # postfix = "sawtooth_approx"
+    # x = np.linspace(spatial_range6[0], spatial_range6[1], num_points)
+    # x, u_data6 = solver_bvp(x, f6)
+
+    # experiments(f6, u_data6, num_points, spatial_range6, postfix)
+    # ########################### TEST №6 ###########################
 
     print("All experiments finished!")
 
