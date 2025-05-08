@@ -170,12 +170,12 @@ if __name__ == "__main__":
         return tf.sin(np.pi * x)
 
     postfix = "ppsin(px)" # set for different filenames
-    # experiments(f, U, num_points, spatial_range, postfix)
+    experiments(f, U, num_points, spatial_range, postfix)
 
     postfix = "ppsin(px)_approx"
     x = np.linspace(spatial_range[0], spatial_range[1], num_points)
     x, u_data = solver_bvp(x, f)
-    # experiments(f, u_data, num_points, spatial_range, postfix)
+    experiments(f, u_data, num_points, spatial_range, postfix)
     ########################### TEST №1 ###########################
 
 
@@ -189,7 +189,7 @@ if __name__ == "__main__":
         return tf.where(x < 0, 0.5 * x * (x + 1), -0.5 * x * (x - 1))
 
     postfix = "-1+1"
-    # experiments(f2, U2, num_points, spatial_range2, postfix)
+    experiments(f2, U2, num_points, spatial_range2, postfix)
 
     postfix = "-1+1_approx"
     x = np.linspace(spatial_range2[0], spatial_range2[1], num_points)
@@ -241,58 +241,28 @@ if __name__ == "__main__":
     experiments(f4, u_data4, num_points, spatial_range4, postfix)
     ########################### TEST №4 ###########################
 
-    # ########################### TEST №5:  Sawtooth Wave ###########################
-    # spatial_range6 = [0, 2*np.pi]
-    # period = np.pi
+    ########################### TEST №5 ###########################
+    spatial_range6 = [0, np.pi]
 
-    # def f6(x):
-    #     return tf.clip_by_value(x % period, 0, period)  # Пила от 0 до period
+    def f6(x):
+        return x * tf.sin(x**2)
 
-    # def U6(x):
-    #     # Двойной интеграл пилы
-    #     x_mod = x % period
-    #     return (1/6)*x_mod**3 - (period/4)*x_mod**2 + (1/12)*period**2*x_mod
+    def U6(x):
+        c1 = tf.math.special.fresnel_cos(tf.sqrt(2 / np.pi) * x)
+        c2 = tf.math.special.fresnel_cos(tf.sqrt(2 * np.pi)) * x
 
-    # postfix = "sawtooth"
-    # # experiments(f6, U6, num_points, spatial_range6, postfix)
+        u = (np.pi * c1 - c2) / (2 * tf.sqrt(2 * np.pi))
 
-    # postfix = "sawtooth_approx"
-    # x = np.linspace(spatial_range6[0], spatial_range6[1], num_points)
-    # x, u_data6 = solver_bvp(x, f6)
+        return u
 
-    # experiments(f6, u_data6, num_points, spatial_range6, postfix)
-    # ########################### TEST №6 ###########################
+    postfix = "xsin(xx)"
+    experiments(f6, U6, num_points, spatial_range6, postfix)
+
+    postfix = "xsin(xx)_approx"
+    x = np.linspace(spatial_range6[0], spatial_range6[1], num_points)
+    x, u_data6 = solver_bvp(x, f6)
+
+    experiments(f6, u_data6, num_points, spatial_range6, postfix)
+    ########################### TEST №5 ###########################
 
     print("All experiments finished!")
-
-
-##################################
-#
-# нужно проверить на следующих функциях
-# 1. Функция с высоким осциллирующим компонентом:
-# def f_oscillating(x):
-#   return np.sin(10 * np.pi * x)  # Высокая частота
-# 2. Функция с резким пиком (Гауссиан):
-# def f_gaussian(x):
-#   center = 0.5
-#   sigma = 0.05  # Узкий пик
-#   return np.exp(- (x - center)**2 / (2 * sigma**2))
-# 3. Функция с разрывом производной (абсолютное значение):
-# def f_abs(x):
-#   return np.abs(x - 0.5)
-# 4. Комбинация функций:
-# def f_combined(x):
-#   return np.sin(5 * np.pi * x) + np.exp(- (x - 0.25)**2 / 0.01) + 0.1 * np.abs(x - 0.75)
-# 5. Случайная функция:
-# def f_random(x):
-#   return np.random.rand(1)[0]  # Возвращает случайное число (не зависящее от x!)
-# def f_random(x, x_grid):
-#     """
-#     Возвращает случайные значения, определенные в точках сетки x_grid,
-#     и интерполирует между ними линейно.
-#     """
-#     if not hasattr(f_random, 'random_values'): # Создаем случайные значения только один раз
-#       f_random.random_values = np.random.rand(len(x_grid))
-#     return np.interp(x, x_grid, f_random.random_values)
-#
-##################################
