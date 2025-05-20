@@ -10,10 +10,10 @@ def l2_norm_square(x, a, b):
 class VariationalNeuralNetwork:
     """
     Реализация метода Ритца с использованием нейронных сетей для решения дифференциальных уравнений.
-    В данном примере решается уравнение Пуассона: -u''(x) = f(x) с граничными условиями u(0) = u(1) = 0.
+    В данном примере решается уравнение Пуассона: -(p(x)u'(x))' + q(x)u(x) = f(x) с граничными условиями u(a) = u(b) = 0.
     """
 
-    def __init__(self, right_hand_side_function, spatial_range=[0, 1], num_hidden=20, batch_size=200, num_iters=1000, lr_rate=1e-3, num_layers=3, optimizer='adam', output_path='Varnn_modern'):
+    def __init__(self, right_hand_side_function, spatial_range=[0, 1], num_hidden=20, batch_size=200, num_iters=1000, lr_rate=1e-3, num_layers=3, optimizer='adam', p_function=None, q_function=None, output_path='Varnn_modern'):
         """
         Инициализация параметров модели.
 
@@ -27,6 +27,8 @@ class VariationalNeuralNetwork:
             num_layers (int): Количество слоев в сети.
             output_path (str): Путь для сохранения обученной модели.
             optimizer (str): Выбор оптимизатора ('adam', 'sgd', 'rmsprop').
+            p_function (callable, optional): Функция p(x).  Если None, используется p(x) = 1.
+            q_function (callable, optional): Функция q(x).  Если None, используется q(x) = 0.
         """
         self.spatial_range = spatial_range
         self.num_hidden = num_hidden
@@ -38,6 +40,17 @@ class VariationalNeuralNetwork:
         self.loss_history = []  # История изменения функции потерь
         self.optimizer_name = optimizer # Сохраняем название оптимизатора
         self.right_hand_side_function = right_hand_side_function  # Сохраняем функцию правой части
+
+        if p_function is None:
+            self.p_function = lambda x: tf.ones_like(x, dtype=tf.float32)
+        else:
+            self.p_function = p_function
+
+        if q_function is None:
+            self.q_function = lambda x: tf.zeros_like(x, dtype=tf.float32)
+        else:
+            self.q_function = q_function
+
         self.model = self.build_model() # Создание модели
         self.optimizer = self.get_optimizer()  # Выбираем оптимизатор  <----
 
@@ -75,7 +88,7 @@ class VariationalNeuralNetwork:
 
     def bubble_function(self, x):
         """
-        Создание "bubble function" для обеспечения граничных условий Дирихле u(0) = u(1) = 0.
+        Создание "bubble function" для обеспечения граничных условий Дирихле u(a) = u(b) = 0.
 
         Args:
             x (tf.Tensor): Входные данные (значения x).
@@ -100,11 +113,16 @@ class VariationalNeuralNetwork:
         with tf.GradientTape() as tape:
             tape.watch(x)  # Отслеживаем градиенты x
             u_nn = self.model(x)  # Выход нейронной сети
-            u = self.bubble_function(x) * u_nn  # Приближенное решение с учетом граничных условий
-        
+            u = self.bubble_function(x) * u_nn # + beta(x) # Приближенное решение с учетом граничных условий
+
         du_dx = tape.gradient(u, x) # du/dx
 
-        loss = tf.reduce_mean(0.5 * tf.square(du_dx) - self.right_hand_side_function(x) * u) * (self.spatial_range[1] - self.spatial_range[0])
+        p = self.p_function(x)
+        q = self.q_function(x)
+
+        f = self.right_hand_side_function(x)
+
+        loss = tf.reduce_mean(0.5 * (p * tf.square(du_dx) + q * tf.square(u)) - f * u) * (self.spatial_range[1] - self.spatial_range[0])
         return loss
 
     @tf.function
@@ -121,7 +139,6 @@ class VariationalNeuralNetwork:
         self.optimizer.apply_gradients(zip(gradients, self.model.trainable_variables)) # Применяем градиенты
 
         return loss
-
 
     def train(self):
         """
@@ -188,14 +205,78 @@ class VariationalNeuralNetwork:
 
         du_dx = tape.gradient(u, x_tf)
         return du_dx.numpy()
+    
+    def predict_derivative_2(self, x):
+        """
+        Предсказание второй производной u''(x) с использованием обученной нейронной сети.
 
-    def compute_aposterrori_error_estimate(self, x, u_exact, beta=1.0):
+        Args:
+            x (np.ndarray): Входные значения x, для которых нужно сделать предсказание.
+
+        Returns:
+            np.ndarray: Предсказанные значения u''(x).
+        """
+        x_tf = tf.convert_to_tensor(x.reshape(-1, 1), dtype=tf.float32)
+
+        with tf.GradientTape() as tape1:
+            tape1.watch(x_tf)
+            with tf.GradientTape() as tape2:
+                tape2.watch(x_tf)
+                u_nn = self.model(x_tf)
+                u = self.bubble_function(x_tf) * u_nn
+
+            du_dx = tape2.gradient(u, x_tf)
+        d2u_dx2 = tape1.gradient(du_dx, x_tf)
+        return d2u_dx2.numpy()
+
+    def compute_aposterrori_error_estimate(self, x):
         """
         Вычисление апостериорной оценки ошибки.
 
         Args:
             x (np.ndarray): Входные значения x.
-            u_exact (callable or tf.Tensor): Точного решения u(x).
+            beta (float): Параметр beta в функционале.
+
+        Returns:
+            float: Апостериорная оценка ошибки.
+        """
+        # 1) Находим производную решения, полученного нейронной сетью
+        dv_dx = self.predict_derivative(x) # Производная приближенного решения (v')
+
+        # 2) Находим производную апроксимации точного решения
+        y = dv_dx # y
+        dy_dx = self.predict_derivative_2(x) # y'
+
+        # 3) Находим норму разности производных ||v' - y'||
+        diff = y - dv_dx
+        diff.reshape(-1, 1)
+        norm_diff_derivs = tf.sqrt(l2_norm_square(diff, self.spatial_range[0], self.spatial_range[1]))
+
+        # 4) Считаем константу Фридгерца
+        a = self.spatial_range[0]
+        b = self.spatial_range[1]
+        C_Omega = (b - a) / np.pi
+
+        # 5) Находим норму невязки исходного уравнения ||y'' + f(x)||
+        x_tf = tf.convert_to_tensor(x.reshape(-1, 1), dtype=tf.float32)
+        f_x = self.right_hand_side_function(x_tf)
+        residual = dy_dx + f_x  # y'' + f(x)
+        residual = residual.numpy().reshape(-1, 1)
+        norm_residual = tf.sqrt(l2_norm_square(residual, self.spatial_range[0], self.spatial_range[1]))
+
+        # 6) Считаем оценку M
+        M = norm_diff_derivs + C_Omega * norm_residual
+
+        return M.numpy()
+
+    # @deprecated("Вычисляет квадрат нормы и использует точное решение, поэтому используй compute_aposterrori_error_estimate, который использует только нейросетевое решение")
+    def compute_aposterrori_error_estimate_square(self, x, u_exact, beta=1.0):
+        """
+        Вычисление апостериорной оценки ошибки.
+
+        Args:
+            x (np.ndarray): Входные значения x.
+            u_exact (callable or tf.Tensor): Апроксимация точного решения u(x).
             beta (float): Параметр beta в функционале.
 
         Returns:
