@@ -44,7 +44,7 @@ def calculate_auto_derivative(x, y):
     if dy_exact_dx is None:
         return 0
  
-    return tf.cast(dy_exact_dx,dtype=tf.float32)
+    return dy_exact_dx
 
 
 def get_cubic_interpolation(x, y, derivative = None):

@@ -256,10 +256,9 @@ class VariationalNeuralNetwork:
         # 5) Находим норму невязки исходного уравнения ||f - qv + (pv')'|| = ||f - qv + p'v' + pv''||
         x_tf = tf.convert_to_tensor(x.reshape(-1, 1), dtype=tf.float32)
         f = self.right_hand_side_function(x_tf)
-        p = self.p_function(x)
+        p = self.p_function(x).numpy().reshape(-1, 1)
         dp_dx = calculate_auto_derivative(x, self.p_function)
-
-        q = self.q_function(x)
+        q = self.q_function(x).numpy().reshape(-1, 1)
 
         residual = f - q * v + dp_dx * dv_dx + p * dv_dx_dx  # f - qv + p'v' + pv''
         residual = residual.numpy().reshape(-1, 1)

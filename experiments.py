@@ -32,11 +32,11 @@ def create_table(data, filename):
     table = ax.table(cellText=df.values, colLabels=df.columns, loc='center', cellLoc='center', fontsize=10)
     table.auto_set_font_size(False)
     table.set_fontsize(10)
-    table.scale(1.2, 1.5)  # Adjust scale for better appearance
+    table.scale(1.2, 1.5)
 
-    plt.tight_layout()  # Adjust layout to prevent labels from overlapping
+    plt.tight_layout()
     plt.savefig(filename, bbox_inches='tight', pad_inches=0.05, transparent=True)
-    plt.close()  # Close the figure to release memory
+    plt.close()
 
 
 # @deprecated("Вычисляет квадрат нормы и использует точное решение, поэтому используй run_experiment, который использует только нейросетевое решение")
@@ -361,7 +361,7 @@ if __name__ == "__main__":
     spatial_range6 = [0, np.pi]
 
     def p(x):
-        return 1 * tf.ones_like(x, dtype=tf.float32)
+        return tf.ones_like(x, dtype=tf.float32)
     
     def q(x):
         return 4 * tf.ones_like(x, dtype=tf.float32)
@@ -376,23 +376,23 @@ if __name__ == "__main__":
     experiments(f6, U6, num_points, spatial_range6, postfix, p, q)
     ########################### TEST №6 ###########################
 
-    # ########################### TEST №7 ###########################
-    # spatial_range7 = [-np.pi/2, np.pi/2]
-
-    # def p2(x):
-    #     return tf.exp(x)
+    ########################### TEST №7 ###########################
+    spatial_range7 = [-np.pi/2, np.pi/2]
     
-    # def q2(x):
-    #     return tf.zeros_like(x, dtype=tf.float32)
+    def p2(x):
+        return tf.cast(tf.exp(x), dtype=tf.float32)
+    
+    def q2(x):
+        return tf.zeros_like(x, dtype=tf.float32)
 
-    # def f7(x):
-    #     return tf.sin(x)
+    def f7(x):
+        return tf.sin(x)
 
-    # def U7(x):
-    #     return tf.exp(-x) / (2*np.exp(np.pi) - 1)*(-2*tf.exp(x + np.pi/2) + (np.exp(np.pi) - 1)*tf.sin(x) - ((np.exp(np.pi) - 1)*tf.cos(x)) + np.exp(np.pi) + 1)
+    def U7(x):
+        return tf.exp(-x) / (2*np.exp(np.pi) - 1)*(-2*tf.exp(x + np.pi/2) + (np.exp(np.pi) - 1)*tf.sin(x) - ((np.exp(np.pi) - 1)*tf.cos(x)) + np.exp(np.pi) + 1)
 
-    # postfix = "-exp(x)*y'' - exp(x)*y = sin(x)"
-    # experiments(f7, U7, num_points, spatial_range7, postfix, p2, q2)
-    # ########################### TEST №7 ###########################
+    postfix = "-exp(x)*y'' - exp(x)*y' = sin(x)"
+    experiments(f7, U7, num_points, spatial_range7, postfix, p2, q2)
+    ########################### TEST №7 ###########################
 
     print("All experiments finished!")
