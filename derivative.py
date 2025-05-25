@@ -40,8 +40,11 @@ def calculate_auto_derivative(x, y):
         tape_exact1.watch(x_tf)
         y_exact = y(x_tf)
     dy_exact_dx = tape_exact1.gradient(y_exact, x_tf) # y'
-
-    return dy_exact_dx
+    
+    if dy_exact_dx is None:
+        return 0
+ 
+    return tf.cast(dy_exact_dx,dtype=tf.float32)
 
 
 def get_cubic_interpolation(x, y, derivative = None):

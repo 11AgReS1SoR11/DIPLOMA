@@ -235,37 +235,38 @@ class VariationalNeuralNetwork:
 
         Args:
             x (np.ndarray): Входные значения x.
-            beta (float): Параметр beta в функционале.
 
         Returns:
             float: Апостериорная оценка ошибки.
         """
-        # 1) Находим производную решения, полученного нейронной сетью
+        # 1) Находим решение, полученного нейронной сетью
+        v = self.predict(x) # Приближённое решение v
         dv_dx = self.predict_derivative(x) # Производная приближенного решения (v')
 
         # 2) Находим производную апроксимации точного решения
-        y = dv_dx # y
-        dy_dx = self.predict_derivative_2(x) # y'
+        dv_dx_dx = self.predict_derivative_2(x) # y'
 
-        # 3) Находим норму разности производных ||v' - y'||
-        diff = y - dv_dx
-        diff.reshape(-1, 1)
-        norm_diff_derivs = tf.sqrt(l2_norm_square(diff, self.spatial_range[0], self.spatial_range[1]))
+        # 3) Находим норму разности производных ||v' - y'|| = 0
 
         # 4) Считаем константу Фридгерца
         a = self.spatial_range[0]
         b = self.spatial_range[1]
         C_Omega = (b - a) / np.pi
 
-        # 5) Находим норму невязки исходного уравнения ||y'' + f(x)||
+        # 5) Находим норму невязки исходного уравнения ||f - qv + (pv')'|| = ||f - qv + p'v' + pv''||
         x_tf = tf.convert_to_tensor(x.reshape(-1, 1), dtype=tf.float32)
-        f_x = self.right_hand_side_function(x_tf)
-        residual = dy_dx + f_x  # y'' + f(x)
+        f = self.right_hand_side_function(x_tf)
+        p = self.p_function(x)
+        dp_dx = calculate_auto_derivative(x, self.p_function)
+
+        q = self.q_function(x)
+
+        residual = f - q * v + dp_dx * dv_dx + p * dv_dx_dx  # f - qv + p'v' + pv''
         residual = residual.numpy().reshape(-1, 1)
         norm_residual = tf.sqrt(l2_norm_square(residual, self.spatial_range[0], self.spatial_range[1]))
 
         # 6) Считаем оценку M
-        M = norm_diff_derivs + C_Omega * norm_residual
+        M = C_Omega * norm_residual
 
         return M.numpy()
 
