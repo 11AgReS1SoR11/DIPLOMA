@@ -14,7 +14,7 @@ def create_table(data, filename):
 
     Args:
         data (dict): Словарь с данными для таблицы.
-        filename (str): Имя файла для сохранения таблицы (например, "table.png").
+        filename (str): Имя файла для сохранения таблицы без ".png".
     """
 
     # Округляем числовые значения в данных
@@ -35,8 +35,31 @@ def create_table(data, filename):
     table.scale(1.2, 1.5)
 
     plt.tight_layout()
-    plt.savefig(filename, bbox_inches='tight', pad_inches=0.05, transparent=True)
+    plt.savefig(f"{filename}.png", bbox_inches='tight', pad_inches=0.05, transparent=True)
     plt.close()
+
+
+def create_excel_table(data, filename):
+    """
+    Создает таблицу из данных и сохраняет ее как файл Excel.
+
+    Args:
+        data (dict): Словарь с данными для таблицы.  Ключи словаря станут заголовками столбцов.
+        filename (str): Имя файла для сохранения таблицы без ".xlsx".
+    """
+
+    # Округляем числовые значения в данных
+    for col in data:
+        if isinstance(data[col], list):
+            data[col] = [round(x, 7) if isinstance(x, float) else x for x in data[col]]
+
+    df = pd.DataFrame(data)
+
+    try:
+        df.to_excel(f"{filename}.xlsx", index=False)  # Сохраняем в Excel, без индекса
+        print(f"Таблица успешно сохранена в файл: {filename}")
+    except Exception as e:
+        print(f"Ошибка при сохранении в Excel: {e}")
 
 
 # @deprecated("Вычисляет квадрат нормы и использует точное решение, поэтому используй run_experiment, который использует только нейросетевое решение")
@@ -195,7 +218,7 @@ def experiments(f, U, num_points, spatial_range, postfix, p = None, q = None):
         neuron_data.append(results)
 
     neuron_df = pd.DataFrame(neuron_data)
-    create_table(neuron_df.to_dict('list'), f"results_neurons_{postfix}.png")
+    create_excel_table(neuron_df.to_dict('list'), f"results_neurons_{postfix}")
 
     # 2) Эксперименты с количеством слоев
     layer_counts = [2, 3, 4, 5]
@@ -205,7 +228,7 @@ def experiments(f, U, num_points, spatial_range, postfix, p = None, q = None):
         layer_data.append(results)
 
     layer_df = pd.DataFrame(layer_data)
-    create_table(layer_df.to_dict('list'), f"results_layers_{postfix}.png")
+    create_excel_table(layer_df.to_dict('list'), f"results_layers_{postfix}")
 
     # 3) Эксперименты с количеством итераций
     iterations_counts = [1000, 2000, 3000, 4000, 5000]
@@ -215,7 +238,7 @@ def experiments(f, U, num_points, spatial_range, postfix, p = None, q = None):
         iters_data.append(results)
 
     iters_df = pd.DataFrame(iters_data)
-    create_table(iters_df.to_dict('list'), f"results_iters_{postfix}.png")
+    create_excel_table(iters_df.to_dict('list'), f"results_iters_{postfix}")
 
     # 4) Эксперименты со скоростью обучения
     learning_rates = [1e-1, 1e-2, 1e-3, 1e-4]
@@ -225,7 +248,7 @@ def experiments(f, U, num_points, spatial_range, postfix, p = None, q = None):
         lr_data.append(results)
 
     lr_df = pd.DataFrame(lr_data)
-    create_table(lr_df.to_dict('list'), f"results_lr_{postfix}.png")
+    create_excel_table(lr_df.to_dict('list'), f"results_lr_{postfix}")
 
     # 5) Эксперименты с разными оптимизаторами
     optimizers = ['adam', 'sgd', 'rmsprop']
@@ -235,7 +258,7 @@ def experiments(f, U, num_points, spatial_range, postfix, p = None, q = None):
         optimizer_data.append(results)
 
     optimizer_df = pd.DataFrame(optimizer_data)
-    create_table(optimizer_df.to_dict('list'), f"results_optimizers_{postfix}.png")
+    create_excel_table(optimizer_df.to_dict('list'), f"results_optimizers_{postfix}")
 
     # 6) Эксперименты с разными оптимизаторами
     batch_sizes = [64, 128, 256, 512, 1024, 2048]
@@ -245,7 +268,7 @@ def experiments(f, U, num_points, spatial_range, postfix, p = None, q = None):
         batch_size_data.append(results)
 
     optimizer_df = pd.DataFrame(batch_size_data)
-    create_table(optimizer_df.to_dict('list'), f"results_batchSize_{postfix}.png")
+    create_excel_table(optimizer_df.to_dict('list'), f"results_batchSize_{postfix}")
 
 
 if __name__ == "__main__":
